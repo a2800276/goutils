@@ -17,8 +17,8 @@ func BitmapAnnotateUint32(b uint32, annotation map[int]string) string {
 			suffix += 1
 		}
 		bit := (b & (1 << i)) >> i
-		a := annotation[int(i+1)]
-		str += fmt.Sprintf("%*d%*s|%2d %s\n", prefix, bit, suffix, "", i+1, a)
+		a := annotation[int(i)]
+		str += fmt.Sprintf("%*d%*s|%2d %s\n", prefix, bit, suffix, "", i, a)
 	}
 	str += " ----------------|----------------\n"
 	str += "31               |               0\n"
@@ -40,8 +40,8 @@ func BitmapAnnotateUint8(b uint8, annotation map[int]string) string {
 			suffix += 1
 		}
 		bit := (b & (1 << i)) >> i
-		a := annotation[int(i+1)]
-		str += fmt.Sprintf("%*d%*s|%d %s\n", prefix, bit, suffix, "", i+1, a)
+		a := annotation[int(i)]
+		str += fmt.Sprintf("%*d%*s|%d %s\n", prefix, bit, suffix, "", i, a)
 	}
 	str += "----|----\n"
 	str += "7   |   0"
