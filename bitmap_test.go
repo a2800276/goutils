@@ -4,7 +4,7 @@ import "testing"
 
 func TestAnnotate(t *testing.T) {
 	b := uint8(0xf0)
-	annotation := map[uint64]string{
+	annotation := map[int]string{
 		1: "BIT ONE",
 		4: "BIT Four",
 		6: "Surprise!",

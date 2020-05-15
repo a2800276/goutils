@@ -2,7 +2,7 @@ package goutils
 
 import "fmt"
 
-func BitmapAnnotateUint32(b uint32, annotation map[uint64]string) string {
+func BitmapAnnotateUint32(b uint32, annotation map[int]string) string {
 	const l = 31
 	str := "\n31               |               0\n"
 	str += " ----------------|----------------\n"
@@ -17,7 +17,7 @@ func BitmapAnnotateUint32(b uint32, annotation map[uint64]string) string {
 			suffix += 1
 		}
 		bit := (b & (1 << i)) >> i
-		a := annotation[uint64(i+1)]
+		a := annotation[int(i+1)]
 		str += fmt.Sprintf("%*d%*s|%2d %s\n", prefix, bit, suffix, "", i+1, a)
 	}
 	str += " ----------------|----------------\n"
@@ -25,7 +25,7 @@ func BitmapAnnotateUint32(b uint32, annotation map[uint64]string) string {
 	return str
 }
 
-func BitmapAnnotateUint8(b uint8, annotation map[uint64]string) string {
+func BitmapAnnotateUint8(b uint8, annotation map[int]string) string {
 	const l = 7
 	str := "\n7   |   0\n"
 	str += "----|----\n"
@@ -40,7 +40,7 @@ func BitmapAnnotateUint8(b uint8, annotation map[uint64]string) string {
 			suffix += 1
 		}
 		bit := (b & (1 << i)) >> i
-		a := annotation[uint64(i+1)]
+		a := annotation[int(i+1)]
 		str += fmt.Sprintf("%*d%*s|%d %s\n", prefix, bit, suffix, "", i+1, a)
 	}
 	str += "----|----\n"
