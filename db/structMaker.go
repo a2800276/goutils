@@ -143,19 +143,26 @@ func (sm *StructMaker) MakeStructForTable(tbl string) (string, error) {
 }
 
 const loadTemplate = `
-func Load{{.StructName}}By{{.PkName}}(db *sql.DB, pk {{.PkType}}) ({{.StructName}}, error) {
-	sql:="SELECT * FROM {{.TableName}} WHERE {{.PkName}} = $1"
+func load{{.StructName}}FromRows(rows *db.Rows)(*{{.StructName}}, error) {
 	var s {{.StructName}}
+	if err := rows.Scan( {{range .Fields}}
+		&s.{{.}}, {{end}} 
+	); err != nil {
+		return err
+	}
+	return &s, nil
+}
+
+func Load{{.StructName}}By{{.PkName}}(db *sql.DB, pk {{.PkType}}) (*{{.StructName}}, error) {
+	sql:="SELECT * FROM {{.TableName}} WHERE {{.PkName}} = $1"
+	var s *{{.StructName}}
 	rows, err := db.Query(sql, pk)
 	if err != nil {
 		return s, err
 	}
 	defer rows.Close()
 	if rows.Next() {
-		// template for load all ...
-		if err := rows.Scan( {{range .Fields}}
-			&s.{{.}}, {{end}} 
-		); err != nil {
+		if s, err = load{{.StructName}}FromRows(rows); err != nil {
 			return err
 		}
 	}
@@ -163,6 +170,25 @@ func Load{{.StructName}}By{{.PkName}}(db *sql.DB, pk {{.PkType}}) ({{.StructName
 		return fmt.Errorf("more than 1 row ...")
 	}
 	return s, nil
+}
+
+func BulkLoad{{.StructName}}(db *sql.DB, limit, offset uint)([]*{{.StructName}}, error) {
+	sql:="SELECT * FROM {{.TableName}} ORDER BY {{.PkName}} LIMIT $1 OFFSET $2"
+	var records []*{.StructName}
+	rows, err := db.Query(sql, limit, offset)
+	if err != nil {
+		return records, err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if s, err := load{{.StructName}}FromRows(rows); err != nil {
+			return records, err
+		}
+		records = append(records, s)
+	}
+	return records, nil
+
+}
 `
 
 type structTmplData struct {
@@ -212,21 +238,25 @@ func (sm *StructMaker) MakeLoadForTable(tbl string) (string, error) {
 
 func (sm *StructMaker) FindPrimaryKey(tbl string) ([]col, error) {
 	sql := `SELECT 
-		column_name --, ordinal_position 
-	FROM 
+		column_name, data_type -- ordinal_position 
+	FROM
+		information_schema.columns
+	JOIN
 		information_schema.key_column_usage u
+	USING
+		(table_schema, table_name, column_name)
 	JOIN
 		information_schema.table_constraints t
 	USING
 		(constraint_name,table_schema,table_name)
 	WHERE 
 		u.table_name = $1
-		AND
+	AND
 		u.table_schema = 'public'
 	AND
 		t.constraint_type='PRIMARY KEY'
 	ORDER BY
-		ordinal_position
+		u.ordinal_position
 	`
 
 	var cols []col
@@ -237,7 +267,7 @@ func (sm *StructMaker) FindPrimaryKey(tbl string) ([]col, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var c col
-		if err := rows.Scan(&c.name); err != nil {
+		if err := rows.Scan(&c.name, &c.dataType); err != nil {
 			return cols, err
 		}
 		cols = append(cols, c)
