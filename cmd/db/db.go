@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
-
+)
+import (
 	"github.com/a2800276/goutils/db"
 )
 
@@ -21,7 +23,11 @@ var (
 func main() {
 	log.Println("Welcome.")
 	flag.Parse()
-	sm, err := db.NewStructMaker(*user, *password, *host, *port, *dbname)
+	connectionString := fmt.Sprintf(
+		"user=%s password=%s host=%s port=%s dbname=%s sslmode=disable",
+		*user, *password,
+		*host, *port, *dbname)
+	sm, err := db.NewStructMaker(connectionString)
 	if err != nil {
 		log.Printf("%v\n", err)
 		flag.Usage()

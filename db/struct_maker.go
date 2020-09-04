@@ -7,16 +7,16 @@ import (
 	"text/template"
 	"unicode"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // shouldn't care but we do, currently only pg
 )
 
 type StructMaker struct {
 	db *sql.DB
 }
 
-func NewStructMaker(user, password, host, port, dbname string) (sm StructMaker, err error) {
-	connString := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, password, host, port, dbname)
-	db, err := sql.Open("postgres", connString)
+func NewStructMaker(connectionString string) (sm StructMaker, err error) {
+	// connString := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, password, host, port, dbname)
+	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		return
 	}
@@ -143,18 +143,20 @@ func (sm *StructMaker) MakeStructForTable(tbl string) (string, error) {
 }
 
 const loadTemplate = `
-func load{{.StructName}}FromRows(rows *db.Rows)(*{{.StructName}}, error) {
+
+
+func load{{.StructName}}FromRows(rows *sql.Rows)(*{{.StructName}}, error) {
 	var s {{.StructName}}
 	if err := rows.Scan( {{range .Fields}}
 		&s.{{.}}, {{end}} 
 	); err != nil {
-		return err
+		return &s, err
 	}
 	return &s, nil
 }
 
 func Load{{.StructName}}By{{.PkName}}(db *sql.DB, pk {{.PkType}}) (*{{.StructName}}, error) {
-	sql:="SELECT * FROM {{.TableName}} WHERE {{.PkName}} = $1"
+	sql:="SELECT {{.DBFields}} FROM {{.TableName}} WHERE {{.PkName}} = $1"
 	var s *{{.StructName}}
 	rows, err := db.Query(sql, pk)
 	if err != nil {
@@ -163,32 +165,53 @@ func Load{{.StructName}}By{{.PkName}}(db *sql.DB, pk {{.PkType}}) (*{{.StructNam
 	defer rows.Close()
 	if rows.Next() {
 		if s, err = load{{.StructName}}FromRows(rows); err != nil {
-			return err
+			return s, err
 		}
 	}
 	if rows.Next() {
-		return fmt.Errorf("more than 1 row ...")
+		return s, fmt.Errorf("more than 1 row ...")
 	}
 	return s, nil
 }
 
-func BulkLoad{{.StructName}}(db *sql.DB, limit, offset uint)([]*{{.StructName}}, error) {
-	sql:="SELECT * FROM {{.TableName}} ORDER BY {{.PkName}} LIMIT $1 OFFSET $2"
-	var records []*{.StructName}
-	rows, err := db.Query(sql, limit, offset)
+type {{.StructName}}Loader func (i int, s *{{.StructName}}) error;
+
+func BulkLoad{{.StructName}}BySql(db *sql.DB, loader {{.StructName}}Loader, sql string, params ...interface{}) (int, error) {
+	i := 0
+	rows, err := db.Query(sql, params...)
 	if err != nil {
-		return records, err
+		return i, err
 	}
 	defer rows.Close()
-	if rows.Next() {
+	for rows.Next() {
 		if s, err := load{{.StructName}}FromRows(rows); err != nil {
-			return records, err
+			return i, err
+		} else {
+			if err = loader(i, s); err != nil {
+				return i, err
+			}
+			i++
 		}
-		records = append(records, s)
 	}
-	return records, nil
+	return i, err
 
 }
+
+func BulkLoad{{.StructName}}(db *sql.DB, limit, offset uint)([]*{{.StructName}}, error) {
+	sql:="SELECT {{.DBFields}} FROM {{.TableName}} ORDER BY {{.PkName}} LIMIT $1 OFFSET $2"
+	var records []*{{.StructName}}
+
+
+	loader := func(i int, s *{{.StructName}}) error {
+		records = append(records, s)
+		return nil
+	}
+
+	_, err := BulkLoad{{.StructName}}BySql(db, loader, sql, limit, offset)
+
+	return records, err
+}
+
 `
 
 type structTmplData struct {
@@ -196,6 +219,7 @@ type structTmplData struct {
 	StructName string
 	PkName     string
 	PkType     string
+	DBFields   string // joined by ",", not very elegant, but better than cluttering template(?)
 	Fields     []string
 }
 
@@ -207,8 +231,10 @@ func (sm *StructMaker) MakeLoadForTable(tbl string) (string, error) {
 	//str := makeStructForTable(tbl, cols), nil
 
 	fields := []string{}
+	dbFields := []string{}
 	for _, f := range cols {
 		fields = append(fields, camelCase(f.name))
+		dbFields = append(dbFields, f.name)
 	}
 
 	cs, err := sm.FindPrimaryKey(tbl)
@@ -225,6 +251,7 @@ func (sm *StructMaker) MakeLoadForTable(tbl string) (string, error) {
 		StructName: camelCase(tbl),
 		PkName:     camelCase(c.name),
 		PkType:     mapType(c.dataType),
+		DBFields:   strings.Join(dbFields, ", "),
 		Fields:     fields,
 	}
 

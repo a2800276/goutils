@@ -1,7 +1,7 @@
 package db
 
 import (
-	mytest "github.com/a2800276/goutils"
+	"github.com/a2800276/goutils"
 	"testing"
 )
 
@@ -22,5 +22,5 @@ func TestMakeStructForTable(t *testing.T) {
 	EventType int32
 }`
 	is := makeStructForTable("event", cols)
-	mytest.AssertEqual(t, is, should)
+	goutils.AssertEqual(t, is, should)
 }
