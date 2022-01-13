@@ -34,8 +34,7 @@ func TestExecuteInsert(t *testing.T) {
 	}
 	result, err := Insert(db, insert, exec)
 	AssertNil(t, err)
-
-	println(result)
+	Assert(t, int(result) == 1)
 
 	selects := `SELECT * FROM bla`
 	rows, err := db.Query(selects)

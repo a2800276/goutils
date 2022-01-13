@@ -15,11 +15,15 @@ import "database/sql"
 // or Scan values into an object.
 type ExecFunc func(*sql.Stmt) (interface{}, error)
 
+type Preparable interface {
+	Prepare(string) (*sql.Stmt, error)
+}
+
 // Compiles the passed SQL statement to a PreparedStatement which
 // is passed off to the provided execFunc and closed once that
 // function returns.
-func Execute(db *sql.DB, sqls string, exec ExecFunc) (interface{}, error) {
-	stmt, err := db.Prepare(sqls)
+func Execute(dbOrTx Preparable, sqls string, exec ExecFunc) (interface{}, error) {
+	stmt, err := dbOrTx.Prepare(sqls)
 	if err != nil {
 		return nil, err
 	}
@@ -30,8 +34,8 @@ func Execute(db *sql.DB, sqls string, exec ExecFunc) (interface{}, error) {
 
 // Same as `execute, but assumes that each INSERT statement is assigned
 // an automated primary key which is retrieved via Result.LastInsertId()
-func Insert(db *sql.DB, sqls string, exec ExecFunc) (int64, error) {
-	result_, err := Execute(db, sqls, exec)
+func Insert(dbOrTx Preparable, sqls string, exec ExecFunc) (int64, error) {
+	result_, err := Execute(dbOrTx, sqls, exec)
 
 	if err != nil {
 		return -1, err
