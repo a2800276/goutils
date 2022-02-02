@@ -10,50 +10,129 @@ import (
 	_ "github.com/lib/pq" // shouldn't care but we do, currently only pg
 )
 
+import util "github.com/a2800276/goutils"
+
+type InfoSchema interface {
+	Tables() ([]string, error)
+	DumpTable(tbl string) ([]col, error)
+	FindPrimaryKey(tbl string) ([]col, error)
+}
+
 type StructMaker struct {
+	InfoSchema
+}
+
+type PGInfoSchema struct {
 	db *sql.DB
 }
 
-func NewStructMaker(connectionString string) (sm StructMaker, err error) {
+type SqliteInfoSchema struct {
+	db *sql.DB
+}
+
+func NewPGInfoSchema(connectionString string) (InfoSchema, error) {
+	db, err := sql.Open("postgres", connectionString)
+	if err != nil {
+		return nil, err
+	}
+	return &PGInfoSchema{db}, nil
+}
+
+func NewSqliteInfoSchema(connectionString string) (InfoSchema, error) {
 	// connString := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, password, host, port, dbname)
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
-		return
+		return nil, err
 	}
-	sm.db = db
-	return
+	return &SqliteInfoSchema{db}, nil
+}
+
+func loadTable(db *sql.DB, tableSql string) ([]string, error) {
+
+	tableFunc := func(stmt *sql.Stmt) (interface{}, error) {
+		var tables []string
+		rows, err := stmt.Query()
+		if err != nil {
+			return nil, err
+		}
+		var table string
+		for rows.Next() {
+			if err = rows.Scan(&table); err != nil {
+				return nil, err
+			} else {
+				tables = append(tables, table)
+			}
+		}
+		return tables, nil
+	}
+	tables_, err := util.Execute(db, tableSql, tableFunc)
+	if err != nil {
+		panic(err)
+	}
+	tables, ok := tables_.([]string)
+	if !ok {
+		panic("!?!")
+	}
+	return tables, nil
 }
 
 // retrieve tables...
-func (sm *StructMaker) Tables() ([]string, error) {
+func (info *PGInfoSchema) Tables() ([]string, error) {
 	sql := `SELECT
 		table_name 
 		FROM
 		information_schema.tables
 		WHERE
 		table_schema = 'public'`
-	tables := []string{}
-	rows, err := sm.db.Query(sql)
-	if err != nil {
-		return tables, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var table string
-		if err := rows.Scan(&table); err != nil {
-			return tables, err
-		}
+	return loadTable(info.db, sql)
+}
 
-		tables = append(tables, table)
-	}
-	return tables, nil
+func (info *SqliteInfoSchema) Tables() ([]string, error) {
+	sql := `
+	SELECT 
+		name
+	FROM
+		sqlite_master -- TODO this will be sqlite_schema
+	WHERE
+		type = 'table'
+	`
+
+	return loadTable(info.db, sql)
 }
 
 type col struct {
 	name, dataType string
 }
 
-func (sm *StructMaker) DumpTable(tbl string) ([]col, error) {
+func loadColumns(db *sql.DB, tableSql string, tableName, string) ([]col, error) {
+
+	tableFunc := func(stmt *sql.Stmt) (interface{}, error) {
+		cols := []col{}
+		rows, err := stmt.Query(tableName)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var c col
+			if err := rows.Scan(&c.name, &c.dataType); err != nil {
+				return cols, err
+			}
+			cols = append(cols, c)
+		}
+		return cols, nil
+	}
+	cols_, err := util.Execute(db, tableSql, tableFunc)
+	if err != nil {
+		panic(err)
+	}
+	cols, ok := cols_.([]col)
+	if !ok {
+		panic("!?!")
+	}
+	return cols, nil
+}
+
+func (info *PGInfoSchema) DumpTable(tbl string) ([]col, error) {
 	sql := `SELECT 
 		column_name, 
 		data_type 
@@ -62,22 +141,16 @@ func (sm *StructMaker) DumpTable(tbl string) ([]col, error) {
 	WHERE 
 		table_name =$1 
 	AND 
-		table_schema='public'`
-	cols := []col{}
-	rows, err := sm.db.Query(sql, tbl)
-	if err != nil {
-		return cols, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var c col
-		if err := rows.Scan(&c.name, &c.dataType); err != nil {
-			return cols, err
-		}
-		cols = append(cols, c)
-	}
-	return cols, nil
-
+		table_schema='public'
+	`
+	
+	return loadColumns(info.db, sql)
+}
+func (info *SqliteInfoSchema) DumpTable(tbl string) ([]col, error) {
+	sql := `
+	PRAGMA TABLE_INFO( :TABLE );
+	`
+	exec := func(stmt * sql.Stmt) (interface{}, )
 }
 
 func camelCase(name string) string {
@@ -263,8 +336,9 @@ func (sm *StructMaker) MakeLoadForTable(tbl string) (string, error) {
 
 }
 
-func (sm *StructMaker) FindPrimaryKey(tbl string) ([]col, error) {
-	sql := `SELECT 
+func (info *PGInfoSchema) FindPrimaryKey(tbl string) ([]col, error) {
+	sql := `
+	SELECT 
 		column_name, data_type -- ordinal_position 
 	FROM
 		information_schema.columns
@@ -287,7 +361,7 @@ func (sm *StructMaker) FindPrimaryKey(tbl string) ([]col, error) {
 	`
 
 	var cols []col
-	rows, err := sm.db.Query(sql, tbl)
+	rows, err := info.db.Query(sql, tbl)
 	if err != nil {
 		return cols, err
 	}
@@ -300,5 +374,4 @@ func (sm *StructMaker) FindPrimaryKey(tbl string) ([]col, error) {
 		cols = append(cols, c)
 	}
 	return cols, nil
-
 }
