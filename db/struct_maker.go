@@ -40,11 +40,12 @@ func NewPGInfoSchema(connectionString string) (InfoSchema, error) {
 
 func NewSqliteInfoSchema(connectionString string) (InfoSchema, error) {
 	// connString := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, password, host, port, dbname)
-	db, err := sql.Open("postgres", connectionString)
+	db, err := sql.Open("sqlite", connectionString)
 	if err != nil {
 		return nil, err
 	}
 	return &SqliteInfoSchema{db}, nil
+	//return nil, nil
 }
 
 func loadTable(db *sql.DB, tableSql string) ([]string, error) {
@@ -102,9 +103,10 @@ func (info *SqliteInfoSchema) Tables() ([]string, error) {
 
 type col struct {
 	name, dataType string
+	pk_ordinal     int // odinal position of primary key in case this col is part.
 }
 
-func loadColumns(db *sql.DB, tableSql string, tableName, string) ([]col, error) {
+func loadColumns(db *sql.DB, tableSql string, tableName string) ([]col, error) {
 
 	tableFunc := func(stmt *sql.Stmt) (interface{}, error) {
 		cols := []col{}
@@ -143,14 +145,67 @@ func (info *PGInfoSchema) DumpTable(tbl string) ([]col, error) {
 	AND 
 		table_schema='public'
 	`
-	
-	return loadColumns(info.db, sql)
+
+	return loadColumns(info.db, sql, tbl)
 }
 func (info *SqliteInfoSchema) DumpTable(tbl string) ([]col, error) {
-	sql := `
-	PRAGMA TABLE_INFO( :TABLE );
+
+	// sqlite> .headers on
+	// sqlite> PRAGMA TABLE_INFO(sqlite_master);
+	// cid|name|type|notnull|dflt_value|pk
+	// 0|type|text|0||0
+	// 1|name|text|0||0
+	// 2|tbl_name|text|0||0
+	// 3|rootpage|int|0||0
+	// 4|sql|text|0||0
+
+	pragma := `
+	SELECT
+		name, type
+	FROM
+		pragma_table_info(:TABLE)
 	`
-	exec := func(stmt * sql.Stmt) (interface{}, )
+	return loadColumns(info.db, pragma, tbl)
+}
+func (info *SqliteInfoSchema) FindPrimaryKey(tbl string) ([]col, error) {
+	pragma := `
+		SELECT
+			name, type
+		FROM
+			pragma_table_info(:TABLE)
+		WHERE 
+			pk > 0
+		ORDER BY
+			pk
+	`
+	return loadColumns(info.db, pragma, tbl)
+}
+
+func (info *PGInfoSchema) FindPrimaryKey(tbl string) ([]col, error) {
+	sql := `
+	SELECT 
+		column_name, data_type -- ordinal_position 
+	FROM
+		information_schema.columns
+	JOIN
+		information_schema.key_column_usage u
+	USING
+		(table_schema, table_name, column_name)
+	JOIN
+		information_schema.table_constraints t
+	USING
+		(constraint_name,table_schema,table_name)
+	WHERE 
+		u.table_name = $1
+	AND
+		u.table_schema = 'public'
+	AND
+		t.constraint_type='PRIMARY KEY'
+	ORDER BY
+		u.ordinal_position
+	`
+
+	return loadColumns(info.db, sql, tbl)
 }
 
 func camelCase(name string) string {
@@ -334,44 +389,4 @@ func (sm *StructMaker) MakeLoadForTable(tbl string) (string, error) {
 
 	return builder.String(), nil
 
-}
-
-func (info *PGInfoSchema) FindPrimaryKey(tbl string) ([]col, error) {
-	sql := `
-	SELECT 
-		column_name, data_type -- ordinal_position 
-	FROM
-		information_schema.columns
-	JOIN
-		information_schema.key_column_usage u
-	USING
-		(table_schema, table_name, column_name)
-	JOIN
-		information_schema.table_constraints t
-	USING
-		(constraint_name,table_schema,table_name)
-	WHERE 
-		u.table_name = $1
-	AND
-		u.table_schema = 'public'
-	AND
-		t.constraint_type='PRIMARY KEY'
-	ORDER BY
-		u.ordinal_position
-	`
-
-	var cols []col
-	rows, err := info.db.Query(sql, tbl)
-	if err != nil {
-		return cols, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var c col
-		if err := rows.Scan(&c.name, &c.dataType); err != nil {
-			return cols, err
-		}
-		cols = append(cols, c)
-	}
-	return cols, nil
 }

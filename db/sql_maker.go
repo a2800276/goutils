@@ -92,6 +92,7 @@ func GetInfo(i interface{}) Info {
 	if !havePK {
 		info.Fields = append(info.Fields, Field{"Id", "int64"})
 		info.Cols = append(info.Cols, PK)
+		info.Placeholder = append(info.Placeholder, fmt.Sprintf("$%d", placeholder)) // not addition in templates
 	}
 	return info
 }

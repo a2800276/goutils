@@ -10,34 +10,36 @@ type TestStruct struct {
 	Three float32
 }
 
-type Data struct {
-	Id                 uint64
-	NeoId              int64
-	Mac                string
-	Timestamp          int64
-	MessageType        byte
-	MvIdle             int
-	MvLoad             int
-	Status             byte
-	Uptime             uint32
-	AdvertisementCount byte
-}
-
 func TestCreate(t *testing.T) {
-	//is := Create(GetInfo(TestStruct{}))
-	is := Create(GetInfo(Data{}))
-	should := "\nCREATE TABLE IF NOT EXIST test_struct (\n\n\t one TEXT\n\n\t,two INTEGER\n\n\t,three REAL\n\n);"
+	is := Create(GetInfo(TestStruct{}))
+	should := "\nCREATE TABLE IF NOT EXISTS test_struct (\n\t one TEXT\n\t,two INTEGER\n\t,three REAL\n\t,id INTEGER PRIMARY KEY AUTOINCREMENT\n);"
 	goutils.AssertEqual(t, is, should)
 }
 func TestInsert(t *testing.T) {
-	is := Insert(GetInfo(Data{}))
-	should := "\nCREATE TABLE IF NOT EXIST test_struct (\n\n\t one TEXT\n\n\t,two INTEGER\n\n\t,three REAL\n\n);"
+	is := Insert(GetInfo(TestStruct{}))
+	should := "\nINSERT INTO test_struct (\n\t one\n\t,two\n\t,three\n\t,id\n)\nVALUES\n($1, $2, $3, $4)\n"
 	goutils.AssertEqual(t, is, should)
 }
 
 func TestSave(t *testing.T) {
-	is := Save(GetInfo(Data{}))
-	should := "\nCREATE TABLE IF NOT EXIST test_struct (\n\n\t one TEXT\n\n\t,two INTEGER\n\n\t,three REAL\n\n);"
+	is := Save(GetInfo(TestStruct{}))
+
+	should := `
+func SaveTestStruct (db *sql.DB, s *TestStruct)(error) {
+	sql := INSERT_TestStruct
+	res, err := db.Exec(sql, 
+		s.One,
+		s.Two,
+		s.Three,
+		s.Id,
+	)
+	if err != nil {
+		return err
+	}
+	s.Id, err = res.LastInsertId()
+	return err
+}
+`
 	goutils.AssertEqual(t, is, should)
 }
 
@@ -54,30 +56,4 @@ func TestUnCaml(t *testing.T) {
 	for _, test := range tests {
 		goutils.AssertEqual(t, uncamel(test.is), test.should)
 	}
-}
-
-type Xfer struct {
-	Id        int64
-	Raw       []byte
-	Mac       string // Beacon in the DB
-	Timestamp int64
-	Rssi      int32
-}
-
-func TestCreateX(t *testing.T) {
-	//is := Create(GetInfo(TestStruct{}))
-	is := Create(GetInfo(Xfer{}))
-	should := "\nCREATE TABLE IF NOT EXIST test_struct (\n\n\t one TEXT\n\n\t,two INTEGER\n\n\t,three REAL\n\n);"
-	goutils.AssertEqual(t, is, should)
-}
-func TestInsertX(t *testing.T) {
-	is := Insert(GetInfo(Xfer{}))
-	should := "\nCREATE TABLE IF NOT EXIST test_struct (\n\n\t one TEXT\n\n\t,two INTEGER\n\n\t,three REAL\n\n);"
-	goutils.AssertEqual(t, is, should)
-}
-
-func TestSaveX(t *testing.T) {
-	is := Save(GetInfo(Xfer{}))
-	should := "\nCREATE TABLE IF NOT EXIST test_struct (\n\n\t one TEXT\n\n\t,two INTEGER\n\n\t,three REAL\n\n);"
-	goutils.AssertEqual(t, is, should)
 }
