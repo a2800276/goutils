@@ -16,6 +16,7 @@ type InfoSchema interface {
 	Tables() ([]string, error)
 	DumpTable(tbl string) ([]col, error)
 	FindPrimaryKey(tbl string) ([]col, error)
+	Db2GoType(dbType string) string
 }
 
 type StructMaker struct {
@@ -35,7 +36,9 @@ func NewPGInfoSchema(connectionString string) (InfoSchema, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PGInfoSchema{db}, nil
+	return &PGInfoSchema{
+		db,
+	}, nil
 }
 
 func NewSqliteInfoSchema(connectionString string) (InfoSchema, error) {
@@ -99,6 +102,87 @@ func (info *SqliteInfoSchema) Tables() ([]string, error) {
 	`
 
 	return loadTable(info.db, sql)
+}
+func (info *PGInfoSchema) Db2GoType(typeName string) string {
+
+	switch typeName {
+	case "character varying":
+		return "string"
+	case "timestamp without time zone":
+		return "time.Time"
+	case "bytea":
+		return "[]byte"
+	case "bigint":
+		return "int64"
+	case "integer":
+		return "int32"
+	default:
+		return "!unknown!" // TODO consider err!
+	}
+}
+
+func (info *SqliteInfoSchema) Db2GoType(typeName string) string {
+	// https://www.sqlite.org/datatype3.html
+	TYPENAME := strings.ToUpper(typeName)
+	switch TYPENAME {
+	case "INT":
+		fallthrough
+	case "INTEGER":
+		fallthrough
+	case "TINYINT":
+		fallthrough
+	case "SMALLINT":
+		fallthrough
+	case "MEDIUMINT":
+		fallthrough
+	case "BIGINT":
+		fallthrough
+	case "UNSIGNED BIG INT":
+		fallthrough
+	case "INT2":
+		fallthrough
+	case "INT8":
+		return "int64" // TODO optimize obv. smaller datatypes
+	case "NUMERIC":
+		fallthrough
+	case "DECIMAL":
+		return "big.Int" // TODO for now, compile fails, add import manually
+	case "CHARACTER":
+		fallthrough
+	case "VARCHAR":
+		fallthrough
+	case "VARYING CHARACTER":
+		fallthrough
+	case "NCHAR":
+		fallthrough
+	case "NATIVE CHARACTER":
+		fallthrough
+	case "NVARCHAR":
+		fallthrough
+	case "TEXT":
+		fallthrough
+	case "CLOB":
+		return "string"
+	case "BLOB":
+		return "[]byte"
+
+	case "REAL":
+		fallthrough
+	case "DOUBLE":
+		fallthrough
+	case "DOUBLE PRECISION":
+		fallthrough
+	case "FLOAT":
+		return "double"
+	case "BOOLEAN":
+		return "boolean"
+	case "DATE":
+		fallthrough
+	case "DATETIME":
+		return "time.Time"
+	default:
+		return "!unknown!"
+	}
 }
 
 type col struct {
@@ -233,28 +317,11 @@ func camelCase(name string) string {
 	return b.String()
 }
 
-func mapType(typeName string) string {
-	switch typeName {
-	case "character varying":
-		return "string"
-	case "timestamp without time zone":
-		return "time.Time"
-	case "bytea":
-		return "[]byte"
-	case "bigint":
-		return "int64"
-	case "integer":
-		return "int32"
-	default:
-		return "!unknown!"
-	}
-}
-
-func makeStructForTable(tbl string, cols []col) string {
+func makeStructForTable(tbl string, cols []col, mapper func(string) string) string {
 	str := fmt.Sprintf("type %s struct {\n", camelCase(tbl))
 	for _, c := range cols {
 		fieldName := camelCase(c.name)
-		typeName := mapType(c.dataType)
+		typeName := mapper(c.dataType)
 		str = fmt.Sprintf("%s\t%s %s\n", str, fieldName, typeName)
 	}
 
@@ -267,7 +334,7 @@ func (sm *StructMaker) MakeStructForTable(tbl string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return makeStructForTable(tbl, cols), nil
+	return makeStructForTable(tbl, cols, sm.Db2GoType), nil
 }
 
 const loadTemplate = `
@@ -378,7 +445,7 @@ func (sm *StructMaker) MakeLoadForTable(tbl string) (string, error) {
 		TableName:  tbl,
 		StructName: camelCase(tbl),
 		PkName:     camelCase(c.name),
-		PkType:     mapType(c.dataType),
+		PkType:     sm.InfoSchema.Db2GoType(c.dataType),
 		DBFields:   strings.Join(dbFields, ", "),
 		Fields:     fields,
 	}
