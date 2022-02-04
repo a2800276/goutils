@@ -40,7 +40,7 @@ func NewPGInfoSchema(connectionString string) (InfoSchema, error) {
 
 func NewSqliteInfoSchema(connectionString string) (InfoSchema, error) {
 	// connString := fmt.Sprintf("user=%s password=%s host=%s port=%s dbname=%s sslmode=disable", user, password, host, port, dbname)
-	db, err := sql.Open("sqlite", connectionString)
+	db, err := sql.Open("sqlite3", connectionString)
 	if err != nil {
 		return nil, err
 	}
