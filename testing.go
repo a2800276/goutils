@@ -20,6 +20,14 @@ func AssertEqual(t *testing.T, is, should interface{}) bool {
 	}
 	return true
 }
+func AssertNotEqual(t *testing.T, is, shouldnt interface{}) bool {
+	t.Helper()
+	if is == shouldnt {
+		t.Errorf("(%s)\n    is: >%#v<\nshould: >%#v<", t.Name(), is, shouldnt)
+		return false
+	}
+	return true
+}
 
 func AssertNotNil(t *testing.T, val interface{}) bool {
 	t.Helper()
