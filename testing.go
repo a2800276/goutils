@@ -40,6 +40,7 @@ func AssertBytesEqual(t *testing.T, is, should []byte) bool {
 	}
 	for i, _ := range is {
 		if is[i] != should[i] {
+			t.Errorf("byte #%d is:%d should:%d", i, is[i], should[i])
 			return false
 		}
 	}
