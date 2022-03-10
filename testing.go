@@ -23,8 +23,23 @@ func AssertEqual(t *testing.T, is, should interface{}) bool {
 
 func AssertBytesEqual(t *testing.T, is, should []byte) bool {
 	t.Helper()
+	if is == nil && should == nil {
+		return true
+	}
+	if is == nil {
+		t.Errorf("arr is nil, should: %v", should)
+		return false
+	} else if should == nil {
+		t.Errorf("should be nil, is: %v", is)
+		return false
+	} else {
+		if len(is) != len(should) {
+			t.Errorf("unequal length: %d (%d)", len(is), len(should))
+			return false
+		}
+	}
 	for i, _ := range is {
-		if !AssertEqual(t, is[i], should[i]) {
+		if is[i] != should[i] {
 			return false
 		}
 	}

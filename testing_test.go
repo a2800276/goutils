@@ -18,5 +18,9 @@ func TestArrayEqual(t *testing.T) {
 	arrShouldnt := []byte{3, 2, 1}
 	t2 := &testing.T{}
 	Assert(t, !AssertBytesEqual(t2, arrIs, arrShouldnt))
-
+	Assert(t, !AssertBytesEqual(t2, arrIs, nil))
+	Assert(t, !AssertBytesEqual(t2, nil, arrIs))
+	empty := []byte{}
+	Assert(t, !AssertBytesEqual(t2, arrIs, empty))
+	AssertBytesEqual(t2, empty, empty)
 }
