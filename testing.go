@@ -20,6 +20,17 @@ func AssertEqual(t *testing.T, is, should interface{}) bool {
 	}
 	return true
 }
+
+func AssertBytesEqual(t *testing.T, is, should []byte) bool {
+	t.Helper()
+	for i, _ := range is {
+		if !AssertEqual(t, is[i], should[i]) {
+			return false
+		}
+	}
+
+	return true
+}
 func AssertNotEqual(t *testing.T, is, shouldnt interface{}) bool {
 	t.Helper()
 	if is == shouldnt {
