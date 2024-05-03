@@ -1,6 +1,9 @@
 package goutils
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestAssertEquals(t *testing.T) {
 	AssertEqual(t, "a", "a")
@@ -30,21 +33,39 @@ func TestAssertWithin(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		b += float32(0.1)
 	}
-	Assert(t, ! (b == float32(1.0)) )
+	Assert(t, !(b == float32(1.0)))
 	AssertWithin(t, b, 1.0, 0.0001)
 
 	AssertWithin(t, 10, 12, 2)
 }
 
 func TestAssertArrayWithin(t *testing.T) {
-	b := []float32{0.0,1.2,2.3,4.5,6.7}
-	for i:=0; i!=10; i++ {
+	b := []float32{0.0, 1.2, 2.3, 4.5, 6.7}
+	for i := 0; i != 10; i++ {
 		for j := 0; j < 5; j++ {
 			b[j] += 0.1
 		}
 	}
-	Assert(t, ! (b[0] == float32(1.0)) )
+	Assert(t, !(b[0] == float32(1.0)))
 	AssertArrayWithin(t, b, []float32{1.0, 2.2, 3.3, 5.5, 7.7}, 0.0001)
 
 	AssertArrayWithin(t, []uint64{10, 10, 10, 10, 10}, []uint64{12, 12, 12, 12, 12}, 2)
+}
+
+func TestAssertNil(t *testing.T) {
+	var a *int = nil
+	var s *string = nil
+	var e error = nil
+	AssertNil(t, a)
+	AssertNil(t, s)
+	AssertNil(t, e)
+}
+
+func TestAssertNotNil(t *testing.T) {
+	a := 1
+	s := "a"
+	e := fmt.Errorf("a")
+	AssertNotNil(t, a)
+	AssertNotNil(t, s)
+	AssertNotNil(t, e)
 }
