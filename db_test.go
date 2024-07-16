@@ -22,14 +22,14 @@ func TestExecuteInsert(t *testing.T) {
 	sqls := `CREATE TABLE bla (i INTEGER);`
 	db := getTestDB(t)
 	defer db.Close()
-	exec := func(stmt *sql.Stmt) (interface{}, error) {
+	exec := func(stmt *sql.Stmt) (sql.Result, error) {
 		return stmt.Exec()
 	}
 	_, err := Execute(db, sqls, exec)
 	AssertNil(t, err)
 
 	insert := `INSERT INTO bla VALUES (:value);`
-	exec = func(stmt *sql.Stmt) (interface{}, error) {
+	exec = func(stmt *sql.Stmt) (sql.Result, error) {
 		return stmt.Exec(5)
 	}
 	result, err := Insert(db, insert, exec)
@@ -48,4 +48,24 @@ func TestExecuteInsert(t *testing.T) {
 		AssertNil(t, err)
 		AssertEqual(t, val, 5)
 	}
+}
+
+type testStruct struct {
+	Value int
+}
+
+func TestExecute(t *testing.T) {
+	db := getTestDB(t)
+	defer db.Close()
+
+	stmt := `select 5;`
+	exec := func(stmt *sql.Stmt) (testStruct, error) {
+		test := testStruct{}
+		err := stmt.QueryRow().Scan(&test.Value)
+		return test, err
+	}
+
+	testStruct, err := Execute(db, stmt, exec)
+	AssertNil(t, err)
+	AssertEqual(t, testStruct.Value, 5)
 }
