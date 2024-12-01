@@ -1,6 +1,8 @@
 package goutils
 
 import (
+	"math/rand"
+	"strconv"
 	"testing"
 )
 
@@ -22,10 +24,42 @@ func TestHistogram(t *testing.T) {
 		0, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 		0, 0, 3, 4, 5, 6, 7, 8, 9, 10,
 		1, 0, 0, 4, 5, 6, 7, 8, 9, 10,
-		1, 0, 0, 0, 5, 6, 7, 8, 9, 10}
+		1, 0, 0, 0, 5, 6, 7, 8, 9, 10, 11}
 	m, _, _, _ := CalculateHistogram(samples, 5)
-	ruler()
+	//ruler()
 	h.DisplayCount = true
+	should := `0 (11)|*************************************************************************
+2 ( 5)|*********************************
+4 ( 9)|***********************************************************
+6 (10)|******************************************************************
+8 (10)|******************************************************************
+10( 6)|***************************************
+`
+
+	AssertEqual(t, h.ToString(m), should)
+}
+
+func parseFloat32(s string) float32 {
+	f32, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		panic(err)
+	}
+	return float32(f32)
+}
+
+func TestRandomHisto(t *testing.T) {
+	samples := []float32{}
+	for i := 0; i < 1000; i++ {
+		samples = append(samples, rand.Float32())
+	}
+	m, _, _, _ := CalculateHistogram(samples, 7)
+	ruler()
+	h := NewASCIIHist()
+	h.DisplayCount = true
+	h.CmpFunc = func(a, b string) bool {
+		return parseFloat32(a) < parseFloat32(b)
+	}
+
 	println(h.ToString(m))
 }
 
