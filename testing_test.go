@@ -52,15 +52,38 @@ func TestAssertArrayWithin(t *testing.T) {
 	AssertArrayWithin(t, []uint64{10, 10, 10, 10, 10}, []uint64{12, 12, 12, 12, 12}, 2)
 }
 
+func TestAssertZeroValue(t *testing.T) {
+	var a *int = nil
+	var s *string = nil
+	var e error = nil
+	var i int = 0
+	AssertZeroValue(t, a)
+	AssertZeroValue(t, s)
+	AssertZeroValue(t, e)
+	AssertZeroValue(t, i)
+	AssertZeroValue(t, "")
+	AssertZeroValue(t, false)
+}
 func TestAssertNil(t *testing.T) {
 	var a *int = nil
 	var s *string = nil
 	var e error = nil
+	var i int = 0
 	AssertNil(t, a)
 	AssertNil(t, s)
 	AssertNil(t, e)
+	AssertNil(t, i)
 }
 
+func TestAssertNotZeroValue(t *testing.T) {
+	a := 1
+	s := "a"
+	e := fmt.Errorf("a")
+	AssertNotZeroValue(t, a)
+	AssertNotZeroValue(t, s)
+	AssertNotZeroValue(t, e)
+	AssertNotZeroValue(t, true)
+}
 func TestAssertNotNil(t *testing.T) {
 	a := 1
 	s := "a"
@@ -68,4 +91,5 @@ func TestAssertNotNil(t *testing.T) {
 	AssertNotNil(t, a)
 	AssertNotNil(t, s)
 	AssertNotNil(t, e)
+	AssertNotNil(t, true)
 }

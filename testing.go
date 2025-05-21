@@ -61,19 +61,32 @@ func AssertNotEqual(t *testing.T, is, shouldnt interface{}) bool {
 	return true
 }
 
-func AssertNotNil[N comparable](t *testing.T, val N) bool {
+// Assert that the provided value is not the zero value of its type.
+func AssertNotZeroValue[N comparable](t *testing.T, val N) bool {
 	t.Helper()
 	var zero N
 	if val == zero {
-		t.Errorf("(%s)\n    not nil: >%#v<\n", t.Name(), val)
+		t.Errorf("(%s)\n    not zero value: >%#v<\n", t.Name(), val)
 		return false
 	}
 	return true
 }
 
-// more specifically, checks that the value is zero value of it's type, not nil
-// e.g. 0 for int, "" for string, false for bool, etc.
+func AssertNotNil[N comparable](t *testing.T, val N) bool {
+	// Deprecated: renamed to AssertNotZeroValue in the course of
+	// moving to generics to better reflect the functionality.
+	return AssertNotZeroValue(t, val)
+}
+
 func AssertNil[N comparable](t *testing.T, val N) bool {
+	// Deprecated: renamed to AssertZeroValue in the course of
+	// moving to generics to better reflect the functionality.
+	return AssertZeroValue(t, val)
+}
+
+// more specifically, checks that the value is zero value of its type,
+// e.g. nil or 0 for int, "" for string, false for bool, etc.
+func AssertZeroValue[N comparable](t *testing.T, val N) bool {
 	t.Helper()
 	var zero N
 	if val != zero {
